@@ -1,0 +1,12 @@
+{
+  "StaleUserDays": 90,
+  "StaleGuestDays": 90,
+  "StaleDeviceDays": 90,
+  "GuestInvitationAgeDays": 30,
+  "CredentialWarningDays": 30,
+  "MaxCredentialLifetimeDays": 180,
+  "MaxGlobalAdministrators": 5,
+  "HybridSyncMaxHours": 24,
+  "SecureScoreThreshold": 0.7,
+  "EmergencyAccessAccountId": []
+}
