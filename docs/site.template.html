@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="Engineering procedures for the Entra ID assessment scripts: access requirements, collection, evidence interpretation, offline replay, and troubleshooting.">
+  <link rel="icon" href="data:,">
+  <title>Entra ID assessment | Engineering guide</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("clawpilotTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-hover: #9a1a41;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+      --cp-overlay: rgba(255, 255, 255, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #3d3b3a;
+      --cp-bg-elevated: #343231;
+      --cp-surface: #292929;
+      --cp-surface-soft: #2e2e2e;
+      --cp-border: #474747;
+      --cp-border-strong: #5f5f5f;
+      --cp-text: #dedede;
+      --cp-text-muted: #919191;
+      --cp-text-soft: #b0b0b0;
+      --cp-accent: #fd8ea1;
+      --cp-accent-hover: #fb7b91;
+      --cp-accent-soft: rgba(253, 142, 161, 0.14);
+      --cp-accent-fg: #1a1a1a;
+      --cp-success: #4ade80;
+      --cp-danger: #f87171;
+      --cp-warning: #fbbf24;
+      --cp-link: #4da6ff;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+      --cp-overlay: rgba(41, 41, 41, 0.88);
+      --cp-panel: rgba(41, 41, 41, 0.72);
+      --cp-panel-strong: rgba(41, 41, 41, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.04);
+      --cp-highlight: rgba(253, 142, 161, 0.12);
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { scroll-padding-top: 6rem; }
+    body {
+      margin: 0;
+      background: var(--cp-bg);
+      color: var(--cp-text);
+      font: 1rem/1.65 "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    a { color: var(--cp-link); text-underline-offset: .2em; }
+    a:hover { text-decoration-thickness: 2px; }
+    :focus-visible { outline: 2px solid var(--cp-accent); outline-offset: 4px; }
+    button, input { font: inherit; }
+    button {
+      padding: .5rem .75rem;
+      border: 1px solid var(--cp-border-strong);
+      border-radius: .625rem;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+      cursor: pointer;
+    }
+    button:hover { background: var(--cp-surface-soft); }
+    code, pre, .item-id {
+      font-family: Consolas, "Courier New", Courier, monospace;
+      font-size: .9em;
+    }
+    :not(pre) > code { overflow-wrap: anywhere; }
+    .skip-link {
+      position: fixed;
+      top: .5rem;
+      left: .5rem;
+      z-index: 20;
+      padding: .75rem 1rem;
+      border: 2px solid var(--cp-accent);
+      border-radius: .625rem;
+      background: var(--cp-surface);
+      transform: translateY(-160%);
+    }
+    .skip-link:focus { transform: translateY(0); }
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--cp-border);
+      background: var(--cp-bg-elevated);
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      max-width: 90rem;
+      margin: 0 auto;
+      padding: 1rem 2rem;
+    }
+    .site-name { font-weight: 650; color: var(--cp-text); text-decoration: none; }
+    .site-kind { margin-left: 1rem; padding-left: 1rem; border-left: 1px solid var(--cp-border); color: var(--cp-text-muted); }
+    .header-meta { display: flex; align-items: center; gap: .75rem; font-size: .8125rem; white-space: nowrap; }
+    .version { color: var(--cp-text-muted); }
+    .layout { display: grid; grid-template-columns: 16rem minmax(0, 1fr); gap: 2rem; max-width: 90rem; margin: 0 auto; padding: 2rem; }
+    .sidebar { align-self: start; position: sticky; top: 6rem; max-height: calc(100dvh - 7rem); overflow-y: auto; padding: .25rem .5rem 1rem 0; font-size: .875rem; }
+    .contents { border: 0; }
+    .contents > summary { cursor: pointer; font-weight: 650; margin-bottom: .75rem; }
+    .nav-group { margin: 1.5rem 0 .5rem; font-size: .75rem; font-weight: 650; color: var(--cp-text-muted); letter-spacing: .04em; text-transform: uppercase; }
+    .sidebar nav a {
+      display: block;
+      padding: .5rem .75rem;
+      border-left: 2px solid var(--cp-border);
+      color: var(--cp-text-muted);
+      text-decoration: none;
+      line-height: 1.45;
+    }
+    .sidebar nav a:hover { color: var(--cp-text); background: var(--cp-surface-soft); }
+    .sidebar nav a[aria-current="location"] { color: var(--cp-accent); border-color: var(--cp-accent); background: var(--cp-accent-soft); }
+    .sidebar-note { margin: 1.5rem .75rem 0; font-size: .8125rem; color: var(--cp-text-soft); }
+    html[data-theme="dark"] .sidebar nav a,
+    html[data-theme="dark"] .nav-group,
+    html[data-theme="dark"] .version,
+    html[data-theme="dark"] .site-kind { color: var(--cp-text-soft); }
+    html[data-theme="dark"] .sidebar nav a[aria-current="location"] { color: var(--cp-accent); }
+    main { min-width: 0; padding: 2.5rem 3rem; border: 1px solid var(--cp-border); border-radius: 1rem; background: var(--cp-surface); }
+    .intro { padding-bottom: 1.5rem; border-bottom: 1px solid var(--cp-border); }
+    .eyebrow { margin: 0 0 .5rem; color: var(--cp-text-muted); font-size: .8125rem; }
+    h1 { margin: 0 0 1rem; font-size: clamp(1.75rem, 3vw, 2.25rem); font-weight: 650; line-height: 1.25; letter-spacing: -.025em; max-width: 25ch; }
+    .intro p:last-child { margin-bottom: 0; color: var(--cp-text-muted); max-width: 65ch; }
+    h2 { margin: 3rem 0 1rem; font-size: 1.4rem; line-height: 1.35; font-weight: 650; }
+    h3 { margin: 2rem 0 .75rem; font-size: 1.0625rem; font-weight: 650; }
+    p { margin: 1rem 0; }
+    ol, ul { padding-left: 1.5rem; }
+    li { margin: .5rem 0; }
+    strong { font-weight: 650; }
+    pre {
+      max-width: 100%;
+      overflow-x: auto;
+      padding: 1rem;
+      border: 1px solid var(--cp-border);
+      border-radius: .625rem;
+      background: var(--cp-surface-soft);
+      color: var(--cp-text);
+      line-height: 1.65;
+      tab-size: 4;
+    }
+    pre > code { font-size: .875rem; }
+    .code-shell { margin: 1.25rem 0; border: 1px solid var(--cp-border); border-radius: .625rem; overflow: hidden; background: var(--cp-surface-soft); }
+    .code-shell pre { margin: 0; border: 0; border-radius: 0; }
+    .code-tools { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .5rem .75rem; border-bottom: 1px solid var(--cp-border); font-size: .75rem; color: var(--cp-text-muted); }
+    .copy-button { min-width: 3.5rem; padding: .25rem .75rem; font-size: .75rem; }
+    .prose table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 1.25rem 0; font-size: .875rem; }
+    th { text-align: left; font-weight: 650; background: var(--cp-surface-soft); }
+    th, td { padding: .75rem; border: 1px solid var(--cp-border); vertical-align: top; min-width: 8rem; }
+    td { overflow-wrap: break-word; }
+    .reference-area { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--cp-border); }
+    .reference-note { color: var(--cp-text-muted); font-size: .9375rem; }
+    .reference-tools { margin: 1.5rem 0 2rem; padding: 1rem; border: 1px solid var(--cp-border); border-radius: .625rem; background: var(--cp-bg-elevated); }
+    .reference-tools label { display: block; margin-bottom: .5rem; font-weight: 650; font-size: .875rem; }
+    .search-line { display: flex; gap: .5rem; }
+    input[type="search"] { width: 100%; min-width: 0; padding: .75rem; border: 1px solid var(--cp-border-strong); border-radius: .625rem; background: var(--cp-surface); color: var(--cp-text); }
+    input::placeholder { color: var(--cp-text-muted); }
+    .filter-help, .filter-count { margin: .5rem 0 0; font-size: .8125rem; color: var(--cp-text-muted); }
+    .filter-count { display: block; color: var(--cp-text); }
+    .reference-item { margin: .75rem 0; border: 1px solid var(--cp-border); border-radius: .625rem; background: var(--cp-surface); }
+    .reference-item > summary { cursor: pointer; padding: 1rem; overflow-wrap: anywhere; line-height: 1.5; }
+    .reference-item > summary:hover { background: var(--cp-surface-soft); border-radius: .625rem; }
+    .reference-item[open] > summary { border-bottom: 1px solid var(--cp-border); }
+    .reference-item > summary::marker { color: var(--cp-text-muted); }
+    .item-id { font-size: .8125rem; font-weight: 650; margin-right: .75rem; }
+    .item-meta { display: block; margin: .5rem 0 0 1rem; font-size: .75rem; color: var(--cp-text-muted); }
+    .entry-body { padding: 1rem; font-size: .875rem; }
+    .entry-body > :first-child { margin-top: 0; }
+    .entry-body > :last-child { margin-bottom: 0; }
+    .entry-body dl { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: .75rem 1rem; margin: 0; }
+    .entry-body dt { color: var(--cp-text-muted); }
+    .entry-body dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+    .entry-body code { font-size: .8125rem; }
+    .source-links { display: flex; flex-wrap: wrap; gap: .375rem .75rem; }
+    .empty-result { padding: 1rem; border-left: 2px solid var(--cp-border-strong); color: var(--cp-text-muted); }
+    .site-footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--cp-border); color: var(--cp-text-muted); font-size: .8125rem; }
+    .site-footer p { margin: .5rem 0; }
+    .copy-feedback:not(:empty) { position: fixed; right: 1rem; bottom: 1rem; z-index: 15; max-width: min(30rem, calc(100% - 2rem)); padding: 1rem; border: 1px solid var(--cp-border-strong); border-radius: .625rem; background: var(--cp-surface); color: var(--cp-text); font-size: .875rem; }
+    noscript p { padding: 1rem; border: 1px solid var(--cp-border); border-radius: .625rem; background: var(--cp-surface-soft); }
+    @media (max-width: 70rem) {
+      .layout { gap: 1.5rem; padding: 1.5rem; grid-template-columns: 14rem minmax(0, 1fr); }
+      main { padding: 2rem; }
+    }
+    @media (max-width: 55rem) {
+      .header-inner { padding: .75rem 1rem; gap: .75rem; }
+      .site-kind { display: none; }
+      .layout { display: block; padding: 1rem; }
+      .sidebar { position: static; max-height: none; padding: .75rem; margin-bottom: 1rem; border: 1px solid var(--cp-border); border-radius: .625rem; background: var(--cp-bg-elevated); }
+      .contents > summary { margin: 0; }
+      .contents[open] > summary { margin-bottom: .75rem; }
+      main { padding: 1.5rem; border-radius: 1rem; }
+      .entry-body dl { grid-template-columns: 1fr; gap: .25rem; }
+      .entry-body dd { margin-bottom: .75rem; }
+      .entry-body dd:last-child { margin-bottom: 0; }
+    }
+    @media (max-width: 30rem) {
+      .version { display: none; }
+      main { padding: 1rem; }
+      h1 { font-size: 1.75rem; }
+      .reference-tools { padding: .75rem; }
+      .search-line { flex-wrap: wrap; }
+      .search-line button { width: 100%; }
+    }
+    @media print {
+      .site-header, .sidebar, .skip-link, .reference-tools, .copy-feedback, .code-tools { display: none !important; }
+      body { background: var(--cp-surface); font-size: 10pt; }
+      .layout { display: block; padding: 0; max-width: none; }
+      main { padding: 0; border: 0; max-width: none; }
+      h2, h3 { break-after: avoid; }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+      .reference-item { break-inside: avoid; }
+      a { color: var(--cp-text); }
+    }
+  </style>
+</head>
+<body id="top">
+  <a class="skip-link" href="#main-content">Skip to guide</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <div><a class="site-name" href="#top">Entra X-Ray</a><span class="site-kind">Engineering guide</span></div>
+      <div class="header-meta"><a href="#reference-title">Reference</a><span class="version">Module @@VERSION@@</span><button id="theme-toggle" type="button" hidden>Theme</button></div>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Guide contents">
+      <details class="contents" id="contents" open>
+        <summary>Contents</summary>
+        <p class="nav-group">Procedures</p>
+        <nav aria-label="Procedures">@@NAV_LINKS@@</nav>
+        <p class="nav-group">Reference</p>
+        <nav aria-label="Reference catalogs">
+          <a href="#reference-title">Filter catalogs</a>
+          <a href="#check-catalog">Check reference</a>
+          <a href="#source-catalog">Source reference</a>
+        </nav>
+        <p class="sidebar-note">Scope: Microsoft Entra ID.<br>Commands run in PowerShell, not in this page.</p>
+      </details>
+    </aside>
+    <main id="main-content" tabindex="-1">
+      <section class="intro" aria-labelledby="guide-title">
+        <p class="eyebrow">Operator documentation</p>
+        <h1 id="guide-title">Run and interpret an Entra ID assessment</h1>
+        <p>Procedures for the PowerShell collector and the offline evidence workflow. Assumptions, side effects, scope, and failure handling are documented with the commands.</p>
+      </section>
+      <noscript><p>The procedures and catalogs are available without JavaScript. Use your browser's Find command to search, and select code to copy it. Filtering, theme controls, and copy buttons require JavaScript.</p></noscript>
+      <article class="prose" id="procedures">
+@@GUIDE_HTML@@
+      </article>
+      <section class="reference-area" aria-labelledby="reference-title">
+        <h2 id="reference-title">Catalog reference</h2>
+        <p class="reference-note">This module version declares @@CHECK_COUNT@@ checks, @@STABLE_COUNT@@ v1.0 sources, and @@BETA_COUNT@@ opt-in beta sources. These counts describe the registry, not tenant coverage. Source availability and collection results must be evaluated for each run.</p>
+        <div class="reference-tools" id="reference-tools" hidden>
+          <label for="reference-search">Filter checks and sources</label>
+          <div class="search-line">
+            <input id="reference-search" type="search" placeholder="Check ID, source, permission, or phrase" autocomplete="off" spellcheck="false" aria-describedby="filter-help">
+            <button type="button" id="clear-search">Clear filter</button>
+          </div>
+          <p class="filter-help" id="filter-help">Matches all entered words, ignoring case. This filters the reference entries, not the procedures. Use browser Find to search the page text.</p>
+          <output class="filter-count" id="filter-count" role="status" aria-live="polite"></output>
+        </div>
+        <h2 id="check-catalog">Check reference</h2>
+        <p class="reference-note">Expand an entry for its prerequisites, observed-condition outcome, priority, investigation guidance, and Microsoft reference. Priority is not a claim that the condition is exploitable.</p>
+        <div class="reference-list" id="check-list">
+@@CHECK_ENTRIES@@
+        </div>
+        <p class="empty-result" id="no-checks" hidden>No checks match this filter. Clear the filter to restore the catalog.</p>
+        <h2 id="source-catalog">Source reference</h2>
+        <p class="reference-note">The path is a collection template. Parent identifiers and UTC window values are substituted during collection. Beta entries require explicit opt-in; a collected inventory is not an automated verdict on every record.</p>
+        <div class="reference-list" id="source-list">
+@@SOURCE_ENTRIES@@
+        </div>
+        <p class="empty-result" id="no-sources" hidden>No sources match this filter. Clear the filter to restore the catalog.</p>
+      </section>
+      <footer class="site-footer">
+        <p>Reference metadata: module @@VERSION@@. Generated by <code>docs\Build-Guide.ps1</code> from the checked-in source files; no tenant access is used during the build.</p>
+        <p><a href="guide.md">Procedure source</a> / <a href="../README.md">Repository README</a> / <a href="#top">Back to top</a></p>
+      </footer>
+    </main>
+  </div>
+  <div class="copy-feedback" id="copy-feedback" role="status" aria-live="polite"></div>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const themeButton = document.getElementById("theme-toggle");
+      const updateThemeButton = () => {
+        const dark = root.getAttribute("data-theme") === "dark";
+        themeButton.textContent = dark ? "Dark theme" : "Light theme";
+        themeButton.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+        themeButton.setAttribute("aria-pressed", String(dark));
+      };
+      themeButton.hidden = false;
+      updateThemeButton();
+      themeButton.addEventListener("click", () => {
+        root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+        updateThemeButton();
+      });
+
+      const contents = document.getElementById("contents");
+      const narrowScreen = window.matchMedia("(max-width: 55rem)");
+      const sizeContents = () => { contents.open = !narrowScreen.matches; };
+      sizeContents();
+      narrowScreen.addEventListener("change", sizeContents);
+
+      const feedback = document.getElementById("copy-feedback");
+      const selectForManualCopy = (code) => {
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(code);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          feedback.textContent = "Copy is unavailable. Text selected; press Ctrl+C or Command+C.";
+        } else {
+          feedback.textContent = "Copy is unavailable. Select the code and use your browser's Copy command.";
+        }
+      };
+      document.querySelectorAll("pre > code").forEach((code, index) => {
+        const pre = code.parentElement;
+        const shell = document.createElement("div");
+        shell.className = "code-shell";
+        const tools = document.createElement("div");
+        tools.className = "code-tools";
+        const language = document.createElement("span");
+        language.textContent = code.classList.contains("language-json") ? "JSON" : "PowerShell";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "copy-button";
+        button.textContent = "Copy";
+        button.setAttribute("aria-label", `Copy ${language.textContent} block ${index + 1}`);
+        pre.before(shell);
+        tools.append(language, button);
+        shell.append(tools, pre);
+        button.addEventListener("click", async () => {
+          if (!navigator.clipboard || !window.isSecureContext) {
+            selectForManualCopy(code);
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(code.textContent);
+            feedback.textContent = `${language.textContent} block copied.`;
+          } catch {
+            selectForManualCopy(code);
+          }
+        });
+      });
+
+      const search = document.getElementById("reference-search");
+      const checks = [...document.querySelectorAll(".check-entry")];
+      const sources = [...document.querySelectorAll(".source-entry")];
+      const updateFilter = () => {
+        const words = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const filter = (items) => {
+          let matches = 0;
+          items.forEach((item) => {
+            const text = item.dataset.search.toLowerCase();
+            item.hidden = !words.every((word) => text.includes(word));
+            if (!item.hidden) matches++;
+          });
+          return matches;
+        };
+        const checkCount = filter(checks);
+        const sourceCount = filter(sources);
+        document.getElementById("no-checks").hidden = checkCount !== 0;
+        document.getElementById("no-sources").hidden = sourceCount !== 0;
+        document.getElementById("filter-count").textContent =
+          `${checkCount} of ${checks.length} checks; ${sourceCount} of ${sources.length} sources.`;
+      };
+      document.getElementById("reference-tools").hidden = false;
+      search.addEventListener("input", updateFilter);
+      search.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          search.value = "";
+          updateFilter();
+        }
+      });
+      document.getElementById("clear-search").addEventListener("click", () => {
+        search.value = "";
+        updateFilter();
+        search.focus();
+      });
+      updateFilter();
+
+      const links = [...document.querySelectorAll(".sidebar nav a")];
+      const setActive = (id) => {
+        links.forEach((link) => {
+          if (link.hash === `#${id}`) link.setAttribute("aria-current", "location");
+          else link.removeAttribute("aria-current");
+        });
+      };
+      const followHash = () => {
+        const id = window.location.hash.slice(1);
+        const target = document.getElementById(id);
+        if (target && target.classList.contains("reference-item")) {
+          search.value = "";
+          updateFilter();
+          target.open = true;
+          setActive(target.classList.contains("check-entry") ? "check-catalog" : "source-catalog");
+          target.scrollIntoView({ block: "start" });
+          target.querySelector("summary").focus({ preventScroll: true });
+        } else if (target) {
+          setActive(id);
+        }
+      };
+      links.forEach((link) => {
+        link.addEventListener("click", () => {
+          setActive(link.hash.slice(1));
+          if (narrowScreen.matches) contents.open = false;
+        });
+      });
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver((entries) => {
+          const visible = entries.filter((entry) => entry.isIntersecting);
+          if (visible.length) setActive(visible[0].target.id);
+        }, { rootMargin: "-10% 0px -70% 0px", threshold: 0 });
+        links.forEach((link) => {
+          const heading = document.getElementById(link.hash.slice(1));
+          if (heading) observer.observe(heading);
+        });
+      }
+      window.addEventListener("hashchange", followHash);
+      followHash();
+
+      let printState = null;
+      window.addEventListener("beforeprint", () => {
+        printState = {
+          theme: root.getAttribute("data-theme"),
+          details: [...document.querySelectorAll("details")].map((item) => [item, item.open])
+        };
+        root.setAttribute("data-theme", "light");
+        printState.details.forEach(([item]) => { item.open = true; });
+      });
+      window.addEventListener("afterprint", () => {
+        if (!printState) return;
+        root.setAttribute("data-theme", printState.theme);
+        printState.details.forEach(([item, open]) => { item.open = open; });
+        printState = null;
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,5 +1,19 @@
 # Microsoft Entra ID X-Ray
 
+## How-to guide
+
+Open the [engineering guide microsite](docs/index.html) for setup, source and permission planning, authentication, execution, output interpretation, offline replay, troubleshooting, and catalog references. It is a self-contained HTML page that can be opened from disk. It does not connect to a tenant.
+
+The procedures are maintained in [guide.md](docs/guide.md); the check/source reference, cloud hosts, parameter defaults/ranges, and configuration example are generated from the current source files. Rebuild after changes:
+
+```powershell
+.\docs\Build-Guide.ps1
+```
+
+Guide tests check that the generated page is synchronized with these inputs. The build uses PowerShell's built-in Markdown renderer and requires no site framework or additional packages. Publish only documentation, not assessment reports or the repository root.
+
+## Assessment scope
+
 A read-only PowerShell toolkit for collecting a defensible picture of a Microsoft Entra ID tenant: the healthy configuration, confirmed adverse conditions, operational debt, suspicious observations, and things that cannot be established from the available evidence.
 
 **69 assessment checks. 70 Microsoft Graph v1.0 evidence sources. Seven additional, explicitly opt-in beta sources.** Every check has a stable identifier, prerequisites, severity/priority, evidence rows, investigation guidance, and Microsoft documentation references.
@@ -318,7 +332,7 @@ exit $r.RecommendedExitCode
 
 ## TDD and coverage
 
-[Invoke-Tests.ps1](Invoke-Tests.ps1) runs Pester, writes NUnit test results and JaCoCo coverage to `TestResults`, fails on failed/discovery/skipped/unexecuted tests, and enforces **100% measured Pester command coverage** across **every executable production `.ps1`/`.psm1`, including the entry script and module loader**. No production files or functions are excluded to reach the target. Dependency manifests/configuration data and the test harness are not represented as executable production coverage.
+[Invoke-Tests.ps1](Invoke-Tests.ps1) runs Pester, writes NUnit test results and JaCoCo coverage to `TestResults`, fails on failed/discovery/skipped/unexecuted tests, and enforces **100% measured Pester command coverage** across **every executable production `.ps1`/`.psm1`, including the entry script, module loader, and guide builder**. No production files or functions are excluded to reach the target. Dependency manifests/configuration data, HTML/JavaScript, and the test harness are not represented as executable PowerShell coverage.
 
 ```powershell
 .\Invoke-Tests.ps1

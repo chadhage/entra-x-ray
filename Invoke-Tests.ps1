@@ -13,6 +13,7 @@ $configuration.CodeCoverage.Path = @(
     Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Recurse -File |
         Where-Object Extension -In @('.ps1', '.psm1') | ForEach-Object FullName
     Join-Path $PSScriptRoot 'Invoke-EntraXray.ps1'
+    Join-Path $PSScriptRoot 'docs\Build-Guide.ps1'
 )
 $configuration.CodeCoverage.CoveragePercentTarget = 100
 $configuration.CodeCoverage.OutputFormat = 'JaCoCo'

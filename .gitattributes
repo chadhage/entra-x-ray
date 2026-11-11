@@ -1,0 +1,2 @@
+# Keep the generated site byte-for-byte comparable with a rebuild.
+docs/index.html text eol=lf
